@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <title>דרך ליחידה </title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <link rel="stylesheet" href="stylesheet.css" />
+</head>
+
+<body>
+  <header>
+    <nav>
+      <ul>
+        <li><u><a href="aboutUs.html">קצת עלינו</a></u></li>|
+        <li><u><a href="contact.html">עזרה ויצירת קשר</a></u></li>|
+        <li><u><a href="main.html">עמוד ראשי</a></u></li>|
+        <li><u><a href="index.html">שיחה</a></u></li>
+      </ul>
+      
+      <img src="photo/sideP.png" alt="side photo" class="side-photo">
+    </nav>
+  </header>
+
+  <main>
+    <div class="cloud-box">
+      <h1>שיח</h1>
+      <div id="chat-log" aria-live="polite"></div>
+
+      <form id="chat-form" class="chat-form">
+        <input id="chat-input" class="chat-input" placeholder=" כתבו הודעה..." autocomplete="off" />
+        <button id="chat-send" class="chat-send" type="submit">לשלוח</button>
+        <button id="start-quiz" class="chat-send" type="button">התחל שאלון</button>
+      </form>
+    </div>
+
+    <table class="bottom-table">
+      <tr>
+        <td colspan="2">
+          <div style="float:left">
+            <a href="mailto:lennieschwartz@gmail.com" style="color:black; font-family:cursive;">lennie schwartz</a>
+          </div>
+          <div id="clock" style="float:right"></div>
+        </td>
+      </tr>
+    </table>
+  </main>
+
+  <script>
+    
+    const API = 'http://localhost:3000';
+    const logEl   = document.getElementById('chat-log');
+    const formEl  = document.getElementById('chat-form');
+    const inputEl = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('chat-send');
+    const startBtn= document.getElementById('start-quiz');
+    const messages = [];
+
+    function escapeHtml(str='') {
+      return str.replaceAll('&','&amp;').replaceAll('<','&lt;')
+                .replaceAll('>','&gt;').replaceAll('"','&quot;')
+                .replaceAll("'",'&#39;');
+    }
+    function add(role, text) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + (role === 'user' ? 'you' : 'ai');
+      div.innerHTML = escapeHtml(text).replace(/\n/g, '<br/>');
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    function renderQuickOptions(fromText) {
+      const lines = fromText.split(/\n/);
+      const opts = [];
+      for (const line of lines) {
+        const m = line.match(/^\s*(\d+)\.\s+(.+)\s*$/);
+        if (m) opts.push({ num: m[1], label: m[2] });
+      }
+      if (opts.length >= 2) {
+        const wrap = document.createElement('div');
+        wrap.className = 'msg ai';
+        const row = document.createElement('div');
+        row.className = 'options';
+        opts.forEach(o => {
+          const b = document.createElement('button');
+          b.textContent = o.label;
+          b.onclick = (ev) => { ev.preventDefault(); sendContent(o.num); };
+          row.appendChild(b);
+        });
+        wrap.appendChild(row);
+        logEl.appendChild(wrap);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+    }
+
+    async function sendContent(content) {
+      add('user', content);
+      messages.push({ role: 'user', content });
+
+      sendBtn.disabled = true;
+      try {
+        const resp = await fetch(`${API}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages })
+        });
+        const ct = resp.headers.get('content-type') || '';
+        const body = ct.includes('application/json') ? await resp.json() : { reply: await resp.text() };
+        const reply = body.reply || '(no reply)';
+        add('assistant', reply);
+        renderQuickOptions(reply);
+        messages.push({ role: 'assistant', content: reply });
+      } catch (err) {
+        add('assistant', 'שגיאת רשת:\n' + err.message);
+      } finally {
+        sendBtn.disabled = false;
+        inputEl.focus();
+      }
+    }
+
+    async function startQuiz() {
+      sendBtn.disabled = true; startBtn.disabled = true;
+      try {
+        const resp = await fetch(`${API}/api/start-quiz`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const data = await resp.json();
+        const reply = data.reply || '(no reply)';
+        add('assistant', reply);
+        renderQuickOptions(reply);
+        messages.push({ role: 'assistant', content: reply });
+      } catch (e) {
+        add('assistant', 'לא הצלחתי להתחיל את השאלון.\n' + e.message);
+      } finally {
+        sendBtn.disabled = false; startBtn.disabled = false;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      startBtn.addEventListener('click', startQuiz);
+
+      formEl.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const content = inputEl.value.trim();
+        if (!content) return;
+        inputEl.value = '';
+        await sendContent(content);
+      });
+
+    
+      (function currentTime(){
+        const date = new Date();
+        const hh = String(date.getHours()).padStart(2,'0');
+        const mm = String(date.getMinutes()).padStart(2,'0');
+        const ss = String(date.getSeconds()).padStart(2,'0');
+        const time = hh + ":" + mm + ":" + ss;
+        const fullDate = date.getDate() + "/" + (date.getMonth()+1) + "/" + date.getFullYear();
+        const el = document.getElementById("clock");
+        if (el) el.innerText = time + " | " + fullDate;
+        setTimeout(currentTime, 1000);
+      })();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>about us</title>
+        <link rel="stylesheet" href="stylesheet.css">
+    </head>
+    <body background="photo/back.jpg">
+         <header>
+            <u>
+            <nav>
+                <ul>
+                    <li><u><a href="aboutUs.html">קצת עלינו</a></u></li>|
+                    <li><u><a href="contact.html">עזרה ויצירת קשר</a></u></li>|
+                    <li><u><a href="main.html">עמוד ראשי</a></u></li>|
+                    <li><u><a href="index.html">שיחה</a></u></li>
+
+                   
+                </ul>
+                <img src="photo/sideP.png" alt="side photo" class="side-photo" style="align-items: right; ">
+            </nav>
+        </u>
+        </header>
+
+        <main>
+        <div style="
+        background: white;
+        border-radius: 50px;
+        padding: 30px;
+        max-width: 700px;
+        margin: 50px auto;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        font-family: Arial, sans-serif;
+        text-align: center; ">
+        <h1 style="color: #2f4f4f; margin-bottom: 15px;"><u>About Us</u></h1>
+
+        <p>
+            <b>הדרך ליחידה</b> – מקום בו אפשר לקבל עזרה ומידע בנוגע למכינות קדם צבאיות ומקומות לשנות שירות
+        </p>
+        <p>
+           לפעמים קשה להבין, למצוא ולבחור את המקום הנכון עבורינו להיות במכינה או בהתנדבות
+        </p>
+        <p>
+            לכן, אתר זה יאפשר על סמך נתונים אישיים לקבל הצעות המתאימות עבורך!
+        </p>
+        <br/>
+        <p><u>המטרה שלנו פשוטה:</u></p>
+        <ul style="list-style-type: none; padding: 0; color: #333; font-size: 16px; line-height: 1.5;">
+            
+            <li>☁️ להעניק רעיונות על סמך נתונים אישיים</li>
+            <li>☁️ להסביר על המכינות ומקומות ההתנדבות השונות לעומק</li>
+            <li>☁️ לעזור לגבש דעה ובחירה בנוגע לעתיד שלך</li>
+        </ul>
+
+        
+    </div>
+        </main>
+
+    
+    <table class="bottom-table"  style="width:100%; border-top:1px solid #ccc; padding-top:10px; font-family:Arial, sans-serif; font-size:0.9rem;">
+    <tr>
+        <td colspan="2">
+          
+            <div style="float:left">
+                <a href="mailto:lennieschwartz@gmail.com" style="color:black; font-family:cursive; size: 10%;"> lennie schwartz </a><br />
+            </div>
+            <br style="clear:both;" />
+            <div style="float:right" id="clock"></div>                 
+        </td>          
+    </tr>
+</table>
+
+<!-- פונקציה עבור הזמן והתאריך שיוצג על תחת הדף -->
+<script type="text/javascript">
+    function currentTime() {
+        var date = new Date();
+        var hh = date.getHours();
+        var mm = date.getMinutes();
+        var ss = date.getSeconds();
+        var hhStr = hh.toString();
+        var mmStr = mm.toString();
+        var ssStr = ss.toString();
+        if (hh < 10) {
+            hhStr = "0" + hh.toString();
+        }
+        if (mm < 10) {
+            mmStr = "0" + mm.toString();
+        }
+        if (ss < 10) {
+            ssStr = "0" + ss.toString();
+        }
+        var time = hhStr + ":" + mmStr + ":" + ssStr;
+
+        fullDate = date.getDate() + "/" + (date.getMonth() + 1) + "/" + date.getFullYear();
+        document.getElementById("clock").innerText = time + " | " + fullDate;
+        setTimeout(function () { currentTime() }, 1000);
+    }
+
+    currentTime(); 
+</script>
+    </body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Talk With Us </title>
+        <link rel="stylesheet" href="stylesheet.css">
+        <meta charset="UTF-8">
+    </head>
+    <body background="photo/back.jpg">
+      
+        <header>
+            <u>
+            <nav>
+                <ul>
+                   <li><u><a href="aboutUs.html">קצת עלינו</a></u></li>|
+                    <li><u><a href="contact.html">עזרה ויצירת קשר</a></u></li>|
+                    <li><u><a href="main.html">עמוד ראשי</a></u></li>|
+                    <li><u><a href="index.html">שיחה</a></u></li>
+
+                    
+                </ul>
+                <img src="photo/sideP.png" alt="side photo" class="side-photo" style="align-items: right; ">
+            </nav>
+        </u>
+        </header>
+
+        <main>
+           <div class="cloud-box">
+                <section id="about">
+                    <h1><u>ברוך הבא לדרך ליחידה!"</u></h1>
+                    <p>כאן ניתן לקיים שיחה עם צאט אשר יעזור להדריך למכינה או התנדבות המתאימה עבורך</p>
+                    <p>למידע נוסף, נא ללכת ל"קצת עלינו"</p>
+                </section>
+            </div>
+        </main>
+        
+
+        <table class="bottom-table" style="width:100%; border-top:1px solid #ccc; padding-top:10px; font-family:Arial, sans-serif; font-size:0.9rem;">
+    <tr>
+        <td colspan="2">
+          
+            <div style="float:left">
+                <a href="mailto:lennieschwartz@gmail.com" style="color:black; font-family:cursive; size: 10%;"> lennie schwartz </a><br />
+            </div>
+            <br style="clear:both;" />
+            <div style="float:right" id="clock"></div>                 
+        </td>          
+    </tr>
+</table>
+
+<!-- פונקציה עבור הזמן והתאריך שיוצג על תחת הדף -->
+<script type="text/javascript">
+    function currentTime() {
+        var date = new Date();
+        var hh = date.getHours();
+        var mm = date.getMinutes();
+        var ss = date.getSeconds();
+        var hhStr = hh.toString();
+        var mmStr = mm.toString();
+        var ssStr = ss.toString();
+        if (hh < 10) {
+            hhStr = "0" + hh.toString();
+        }
+        if (mm < 10) {
+            mmStr = "0" + mm.toString();
+        }
+        if (ss < 10) {
+            ssStr = "0" + ss.toString();
+        }
+        var time = hhStr + ":" + mmStr + ":" + ssStr;
+
+        fullDate = date.getDate() + "/" + (date.getMonth() + 1) + "/" + date.getFullYear();
+        document.getElementById("clock").innerText = time + " | " + fullDate;
+        setTimeout(function () { currentTime() }, 1000);
+    }
+
+    currentTime(); 
+</script>
+    
+</body>
+</html>
