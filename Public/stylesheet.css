@@ -1,8 +1,7 @@
 body {
     margin: 0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    /* אופציה לצבע רקע עם לא מתאים התמונה */
-    /* background: linear-gradient(to bottom right, #d9e4dd, #cce3de); */
+    
     color: #333;
     overflow-x: hidden;
     background-image: url('photo/back.jpg');
@@ -69,7 +68,6 @@ p {
     font-size: 1.1rem;
 }
 
-/* Chat container styled like your cloud-box */
 .cloud-box {
     position: relative;
     background: white;
@@ -82,7 +80,7 @@ p {
     box-shadow: 0 8px 15px rgba(0,0,0,0.1);
 }
 
-/* Chat log area */
+
 #chat-log {
     background: #fff;
     border: 1px solid #ccc;
@@ -94,7 +92,7 @@ p {
     font-size: 0.95rem;
 }
 
-/* Chat messages */
+
 .msg {
     margin: 10px 0;
     padding: 8px 12px;
@@ -116,7 +114,6 @@ p {
     color: #333;
 }
 
-/* Chat form */
 .chat-form {
     display: flex;
     gap: 8px;
@@ -146,7 +143,7 @@ p {
     background: #3b7a6f;
 }
 
-/* For smaller screens */
+
 @media (max-width: 600px) {
     nav ul {
         flex-direction: column;

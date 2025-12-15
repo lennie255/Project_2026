@@ -5,27 +5,29 @@ const cors = require('cors');
 const path = require('path');
 const morgan = require('morgan');
 
-//open ai עם המשתמש והקוד שהוזן על פי המשתמש בפתחתי 
+//open ai עם המשתמש והקוד שהוזן על פי המשתמש שפתחתי 
 let OpenAI, client;
 try {
   OpenAI = require('openai');
   if (process.env.OPENAI_API_KEY) client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 } catch {}
 
+//יצירת מופע שרת
 const app = express();
-app.use(morgan('dev'));
+app.use(morgan('dev')); //הדפסת לוגים של בקשות 
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-// חיבור לשאלון שמעניק 
+// חיבור לשאלון  
 const { createQuestionnaire } = require('./questionnaireBot');
-
+//זיכרון זמני לכל משתמש לאסוף את ההודעות 
 const quizBuffers = new Map();
 function pushToQuizBuffer(userId, text) {
   if (!quizBuffers.has(userId)) quizBuffers.set(userId, []);
   quizBuffers.get(userId).push(text);
 }
-async function sendQuizText(userId, text) { pushToQuizBuffer(userId, text); }
+
+async function sendQuizText(userId, text) { pushToQuizBuffer(userId, text); } //העברת השאלון 
 async function sendQuizOptions(userId, text, options) {
   const rendered = text + '\n' +
     options.map((o,i)=>`${i+1}. ${o.label}`).join('\n') +
@@ -39,15 +41,15 @@ async function llmForQuiz(messages) {
 }
 const quiz = createQuestionnaire({ sendText: sendQuizText, sendOptions: sendQuizOptions, llm: llmForQuiz });
 
-// ---- API ----
+// נתיבי API
 app.get('/api/ping', (_req, res) => res.json({ ok: true, t: Date.now() }));
 
 app.post('/api/start-quiz', async (_req, res) => {
   try {
-    const userId = 'default';
+    const userId = 'default'; //מאתחל
     quizBuffers.set(userId, []);
-    await quiz.start(userId);
-    const reply = (quizBuffers.get(userId) || []).join('\n\n');
+    await quiz.start(userId); //קורא להתחיל 
+    const reply = (quizBuffers.get(userId) || []).join('\n\n'); //מחזיר תוצאות 
     return res.json({ reply, quiz: true });
   } catch (e) {
     console.error('start-quiz error:', e);
@@ -74,16 +76,27 @@ app.post('/api/chat', async (req, res) => {
 
     if (client) {
       const response = await client.responses.create({
-        model: 'gpt-4o-mini',
-        input: [
-          { role: 'system', content: 'You are a friendly helper. Be concise and supportive.' },
-          ...messages
-        ]
-      });
+  model: 'gpt-4o-mini',
+  input: [
+    {
+      role: 'system',
+      content:
+        'You are a helpful assistant about Israeli mechinot (pre-army programs) and volunteering. Use the knowledge base when answering. If the answer is not in the knowledge base, say you are not sure.'
+    },
+    ...messages
+  ],
+  tools: [{ type: "file_search" }],
+  tool_resources: {
+    file_search: {
+      vector_store_ids: [process.env.VECTOR_STORE_ID],
+    },
+  },
+});
       return res.json({ reply: response.output_text });
     } else {
-      return res.json({ reply: 'השרת פעיל. לחצו "התחל שאלון" כדי להתחיל 🙂' });
+      return res.json({ reply: ' . לחצו "התחל שאלון" כדי להתחיל' });
     }
+    //טיפול בשגיאות 
   } catch (err) {
     console.error('Chat error:', err);
     return res.status(500).json({ error: 'server_error', detail: err?.message || 'unknown' });
@@ -101,11 +114,11 @@ app.get('/__debug', (req, res) => {
   });
 });
 
-
+//קבצים סטטים ודף בית 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (_req,res)=> res.sendFile(path.join(__dirname,'public','index.html')));
-
-// השרת שעליו נמצאים 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running at http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+});

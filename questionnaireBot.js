@@ -1,13 +1,11 @@
 // questionnaireBot.js
 function createQuestionnaire({ sendText, sendOptions, store, llm }) {
-  // ==========================
-  // מבנה השאלון: 5 שאלות סגורות + אופציונלית שאלה 6 פתוחה (בברירת מחדל מכובה)
-  // ==========================
+  
   const QUIZ = {
     id: "prearmy-volunteer-fit",
     title: "שאלון התאמה קצר (5 שאלות)",
     questions: [
-      // Q1: תחומי עניין
+      // : תחומי עניין
       {
         id: "q1",
         type: "choice",
@@ -18,7 +16,7 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
           { id: "outdoor",label: "טבע / שטח / אתגר פיזי",         points: 4 },
         ],
       },
-      // Q2: סגנון עשייה
+      // : סגנון עשייה
       {
         id: "q2",
         type: "choice",
@@ -29,18 +27,18 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
           { id: "lead",    label: "ארגון/מנהיגות/תיאום משימות", points: 3 },
         ],
       },
-      // Q3: סביבת עבודה מועדפת
+      //  סביבת עבודה מועדפת
       {
         id: "q3",
         type: "choice",
-        text: "איפה היית רוצה לפעול ביום-יום?",
+        text: "איפה היית רוצה לפעול ?",
         options: [
-          { id: "lab",   label: "סביבת מחשב/מעבדה/פרויקטים טכנולוגיים", points: 5 },
-          { id: "people",label: "קהילה/קשר בין-אישי/חניכה",                points: 2 },
-          { id: "field", label: "שטח/לוגיסטיקה/אירועי שטח",               points: 3 },
+          { id: "lab",   label: "סביבת מחשב / מעבדה / פרויקטים טכנולוגיים", points: 5 },
+          { id: "people",label: "קהילה / קשר בין-אישי / חניכה",  points: 2 },
+          { id: "field", label: "שטח / לוגיסטיקה / אירועי שטח", points: 3 },
         ],
       },
-      // Q4: רמת מחויבות
+      //  רמת מחויבות
       {
         id: "q4",
         type: "choice",
@@ -51,7 +49,7 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
           { id: "low",    label: "קצרה/גמישה (מפגשים נקודתיים)", points: 1 },
         ],
       },
-      // Q5: עבודה בצוות או לבד
+      //  עבודה בצוות או לבד
       {
         id: "q5",
         type: "choice",
@@ -63,8 +61,7 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
         ],
       },
 
-      // ---- Q6: אופציונלי (מכובה כעת) ----
-      // כדי להפעיל אותה: שנה/י enableOpenQuestion=true (שורה ~130)
+      //שאלה פתוחה להוסיף 
       {
         id: "q6",
         type: "open",
@@ -75,7 +72,7 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
           positive: [
             // טכנולוגי/מתמטי
             { terms: ["מחשבים","תכנות","קוד","אלגוריתמים","מתמטיקה","פיזיקה","סייבר","רובוטיקה"], weight: 3 },
-            // חברתי/סיוע
+            // חברתי
             { terms: ["חברים","קהילה","חינוך","הדרכה","קשישים","ילדים","לעזור לאנשים","התנדבות"], weight: 2 },
             // ספורט/שטח
             { terms: ["פעילות גופנית","ספורט","כושר","שטח","טבע","טיולים"], weight: 2 },
@@ -84,7 +81,7 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
         }
       },
     ],
-    // טווחי המלצה: עד 9 → חברתי; 10–20 → טכנולוגי/מתמטי; 21+ → "אחרות" (מתקדמות/שטח/אתגר)
+    
     bands: [
       { min: 0,  max: 9,  key:"social", label: "התאמה חברתית",   summary: "כדאי להתמקד במסגרות עם עשייה חברתית ישירה." },
       { min: 10, max: 20, key:"tech",   label: "התאמה טכנולוגית", summary: "כדאי לשקול מסגרות טכנולוגיות/מתמטיות." },
@@ -92,17 +89,16 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
     ],
   };
 
-  // האם לכלול את השאלה ה-6 כעת?
-  const enableOpenQuestion = false; // שנה/י ל-true כשתרצי להפעיל
-
-  // במידה ומכבים את Q6 – נסנן אותה החוצה כרגע
+ //לכלול את שאלה שש
+  const enableOpenQuestion = false; 
+//במידה ומכבים את שש אז לסנן אותה החוצה 
   if (!enableOpenQuestion) {
     QUIZ.questions = QUIZ.questions.filter(q => q.id !== "q6");
   }
 
-  // ==========================
-  // State (זיכרון בתהליך או חנות חיצונית)
-  // ==========================
+  
+ 
+  
   const memory = new Map();
   const getState = async (uid) => {
     if (store?.get) return (await store.get(uid)) || { step:0,total:0,answers:[],active:false };
@@ -111,9 +107,8 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
   };
   const setState = async (uid, v) => store?.set ? store.set(uid, v) : memory.set(uid, v);
 
-  // ==========================
-  // עזר ניקוד
-  // ==========================
+ 
+ 
   const normalize = (txt="") =>
     txt.toString().toLowerCase()
       .replace(/[\u0591-\u05C7]/g, "")     // ניקוד עברי
@@ -145,9 +140,7 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
   const bandFor  = (t) => QUIZ.bands.find(b => t >= b.min && t <= b.max) || QUIZ.bands.at(-1);
   const currentQ = (s) => QUIZ.questions[s.step];
 
-  // ==========================
-  // זרימה
-  // ==========================
+  
   async function start(uid) {
     const s = await getState(uid);
     s.active = true; s.step = 0; s.total = 0; s.answers = [];
@@ -185,7 +178,7 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
         if (!chosen) chosen = q.options.find(o => o.label.toLowerCase().includes(normalized));
       }
       if (!chosen) {
-        await sendText(uid, "לא הבנתי. בחר/י מספר 1/2/3… או כתבי את שם האפשרות.");
+        await sendText(uid, "נא לבחור אפשרות או להקליד את המספר תשובה ");
         await askNext(uid); return true;
       }
       s.answers.push({ qid:q.id, type:"choice", optionId:chosen.id, label:chosen.label, points:chosen.points });
@@ -195,7 +188,7 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
 
     if (q.type === "open") {
       const answer = (message || "").trim();
-      if (!answer) { await sendText(uid, "אשמח לתשובה קצרה 🙂"); return true; }
+      if (!answer) { await sendText(uid, "נא לענות תשובה קצרה יותר "); return true; }
       let pts = 0;
       if (q.scoring?.mode === "keywords") pts = scoreByKeywords(answer, q.scoring);
       else if (q.scoring?.mode === "llm") pts = await scoreByLLM(answer, q.scoring);
@@ -207,9 +200,7 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
     return false;
   }
 
-  // ==========================
-  // הצעת מסגרות לפי ניקוד
-  // ==========================
+  
   const RECOMMENDATIONS = {
     tech: [
       "מכינות/מסגרות עם דגש טכנולוגי/מחשובי/מתמטי",
@@ -228,12 +219,13 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
     ]
   };
 
+  
+
   async function finish(uid) {
     const s = await getState(uid);
     const band = bandFor(s.total);
 
-    // הצעות לפי הסף שהוגדר בדרישה:
-    // >20 → 'other', אחרת אם >10 → 'tech', אחרת → 'social'
+   
     const track = (s.total > 20) ? 'other' : (s.total > 10) ? 'tech' : 'social';
     const suggestions = RECOMMENDATIONS[track];
 
@@ -244,10 +236,6 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
     ).join("\n");
 
     const msg = [
-      "סיימנו! ✅",
-      `ניקוד כולל: ${s.total} → ${band.label}`,
-      band.summary,
-      "",
       "המלצות לפי הפרופיל שלך:",
       ...suggestions.map((x,i)=>`${i+1}. ${x}`),
       "",
