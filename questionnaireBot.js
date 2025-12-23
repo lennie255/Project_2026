@@ -99,6 +99,7 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
   
  
   
+  
   const memory = new Map();
   const getState = async (uid) => {
     if (store?.get) return (await store.get(uid)) || { step:0,total:0,answers:[],active:false };
@@ -137,7 +138,13 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
     catch { return 0; }
   }
 
-  const bandFor  = (t) => QUIZ.bands.find(b => t >= b.min && t <= b.max) || QUIZ.bands.at(-1);
+  // תיקון תאימות: בלי .at(-1)
+  const bandFor  = (t) => {
+    const found = QUIZ.bands.find(b => t >= b.min && t <= b.max);
+    if (found) return found;
+    return QUIZ.bands.length ? QUIZ.bands[QUIZ.bands.length - 1] : { min:0, max:100, key:"other", label:"", summary:"" };
+  };
+
   const currentQ = (s) => QUIZ.questions[s.step];
 
   
@@ -175,7 +182,8 @@ function createQuestionnaire({ sendText, sendOptions, store, llm }) {
       if (!chosen && message) {
         const idx = parseInt(normalized, 10);
         if (!isNaN(idx) && idx >= 1 && idx <= q.options.length) chosen = q.options[idx - 1];
-        if (!chosen) chosen = q.options.find(o => o.label.toLowerCase().includes(normalized));
+        // תיקון: לא לבצע includes על מחרוזת ריקה
+        if (!chosen && normalized.length > 0) chosen = q.options.find(o => o.label.toLowerCase().includes(normalized));
       }
       if (!chosen) {
         await sendText(uid, "נא לבחור אפשרות או להקליד את המספר תשובה ");

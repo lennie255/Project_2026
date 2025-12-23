@@ -2,9 +2,8 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <title>דרך ליחידה </title>
+  <title>דרך ליחידה</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  
   <link rel="stylesheet" href="stylesheet.css" />
 </head>
 
@@ -17,7 +16,6 @@
         <li><u><a href="main.html">עמוד ראשי</a></u></li>|
         <li><u><a href="index.html">שיחה</a></u></li>
       </ul>
-      
       <img src="photo/sideP.png" alt="side photo" class="side-photo">
     </nav>
   </header>
@@ -48,7 +46,8 @@
 
   <script>
     
-    const API = 'http://localhost:3000';
+    const API = '';
+
     const logEl   = document.getElementById('chat-log');
     const formEl  = document.getElementById('chat-form');
     const inputEl = document.getElementById('chat-input');
@@ -56,20 +55,28 @@
     const startBtn= document.getElementById('start-quiz');
     const messages = [];
 
+    let isSending = false;
+
     function escapeHtml(str='') {
-      return str.replaceAll('&','&amp;').replaceAll('<','&lt;')
-                .replaceAll('>','&gt;').replaceAll('"','&quot;')
-                .replaceAll("'",'&#39;');
+      // replaceAll יכול להפיל בדפדפנים ישנים; split/join תואם יותר
+      return String(str)
+        .split('&').join('&amp;')
+        .split('<').join('&lt;')
+        .split('>').join('&gt;')
+        .split('"').join('&quot;')
+        .split("'").join('&#39;');
     }
+
     function add(role, text) {
       const div = document.createElement('div');
       div.className = 'msg ' + (role === 'user' ? 'you' : 'ai');
-      div.innerHTML = escapeHtml(text).replace(/\n/g, '<br/>');
+      div.innerHTML = escapeHtml(String(text ?? '')).replace(/\n/g, '<br/>');
       logEl.appendChild(div);
       logEl.scrollTop = logEl.scrollHeight;
     }
+
     function renderQuickOptions(fromText) {
-      const lines = fromText.split(/\n/);
+      const lines = String(fromText ?? '').split(/\n/);
       const opts = [];
       for (const line of lines) {
         const m = line.match(/^\s*(\d+)\.\s+(.+)\s*$/);
@@ -82,6 +89,7 @@
         row.className = 'options';
         opts.forEach(o => {
           const b = document.createElement('button');
+          b.type = 'button'; // חשוב: אחרת בתוך form זה עלול להיות submit
           b.textContent = o.label;
           b.onclick = (ev) => { ev.preventDefault(); sendContent(o.num); };
           row.appendChild(b);
@@ -92,44 +100,84 @@
       }
     }
 
+    async function parseReply(resp) {
+      const ct = resp.headers.get('content-type') || '';
+      let body;
+      try {
+        body = ct.includes('application/json') ? await resp.json() : { reply: await resp.text() };
+      } catch {
+        body = {};
+      }
+
+      const reply =
+        (body && typeof body.reply === 'string' && body.reply.trim())
+          ? body.reply
+          : (body && (body.detail || body.error))
+            ? `Server error: ${body.detail || body.error}`
+            : (!resp.ok)
+              ? `No reply (HTTP ${resp.status})`
+              : `No reply (HTTP ${resp.status})`;
+
+      return { body, reply };
+    }
+
+    function setUiDisabled(disabled) {
+      sendBtn.disabled = disabled;
+      startBtn.disabled = disabled;
+      inputEl.disabled = disabled;
+    }
+
     async function sendContent(content) {
+      if (isSending) return;
+      isSending = true;
+
       add('user', content);
       messages.push({ role: 'user', content });
 
-      sendBtn.disabled = true;
+      setUiDisabled(true);
+
       try {
         const resp = await fetch(`${API}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages })
         });
-        const ct = resp.headers.get('content-type') || '';
-        const body = ct.includes('application/json') ? await resp.json() : { reply: await resp.text() };
-        const reply = body.reply || '(no reply)';
+
+        const { reply } = await parseReply(resp);
         add('assistant', reply);
         renderQuickOptions(reply);
         messages.push({ role: 'assistant', content: reply });
       } catch (err) {
-        add('assistant', 'שגיאת רשת:\n' + err.message);
+        add('assistant', 'שגיאת רשת:\n' + (err && err.message ? err.message : String(err)));
       } finally {
-        sendBtn.disabled = false;
+        setUiDisabled(false);
+        isSending = false;
         inputEl.focus();
       }
     }
 
     async function startQuiz() {
-      sendBtn.disabled = true; startBtn.disabled = true;
+      if (isSending) return;
+      isSending = true;
+
+      setUiDisabled(true);
+
       try {
-        const resp = await fetch(`${API}/api/start-quiz`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-        const data = await resp.json();
-        const reply = data.reply || '(no reply)';
+        const resp = await fetch(`${API}/api/start-quiz`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}'
+        });
+
+        const { reply } = await parseReply(resp);
         add('assistant', reply);
         renderQuickOptions(reply);
         messages.push({ role: 'assistant', content: reply });
       } catch (e) {
-        add('assistant', 'לא הצלחתי להתחיל את השאלון.\n' + e.message);
+        add('assistant', 'לא הצלחתי להתחיל את השאלון.\n' + (e && e.message ? e.message : String(e)));
       } finally {
-        sendBtn.disabled = false; startBtn.disabled = false;
+        setUiDisabled(false);
+        isSending = false;
       }
     }
 
@@ -144,8 +192,7 @@
         await sendContent(content);
       });
 
-    
-      (function currentTime(){
+      (function currentTime() {
         const date = new Date();
         const hh = String(date.getHours()).padStart(2,'0');
         const mm = String(date.getMinutes()).padStart(2,'0');
