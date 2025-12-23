@@ -1,108 +1,151 @@
-// חיבור השרתים
+// server.js (מתוקן: בלי Vector Store + בלי "No reply" אחרי השאלון)
 require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const morgan = require('morgan');
+const fs = require('fs');
 
-//open ai עם המשתמש והקוד שהוזן על פי המשתמש שפתחתי 
+// OpenAI
 let OpenAI, client;
 try {
   OpenAI = require('openai');
-  if (process.env.OPENAI_API_KEY) client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-} catch {}
+  if (process.env.OPENAI_API_KEY) {
+    client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+} catch (e) {
+  console.warn('OpenAI init failed:', e?.message || e);
+}
 
-//יצירת מופע שרת
+// יצירת מופע שרת
 const app = express();
-app.use(morgan('dev')); //הדפסת לוגים של בקשות 
+app.use(morgan('dev'));
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-// חיבור לשאלון  
+// חיבור לשאלון
 const { createQuestionnaire } = require('./questionnaireBot');
-//זיכרון זמני לכל משתמש לאסוף את ההודעות 
+
+// זיכרון זמני לכל משתמש לאסוף את ההודעות
 const quizBuffers = new Map();
 function pushToQuizBuffer(userId, text) {
   if (!quizBuffers.has(userId)) quizBuffers.set(userId, []);
-  quizBuffers.get(userId).push(text);
+  quizBuffers.get(userId).push(String(text ?? ''));
 }
 
-async function sendQuizText(userId, text) { pushToQuizBuffer(userId, text); } //העברת השאלון 
+async function sendQuizText(userId, text) { pushToQuizBuffer(userId, text); }
 async function sendQuizOptions(userId, text, options) {
-  const rendered = text + '\n' +
-    options.map((o,i)=>`${i+1}. ${o.label}`).join('\n') +
+  const rendered =
+    String(text ?? '') + '\n' +
+    (options || []).map((o, i) => `${i + 1}. ${o.label}`).join('\n') +
     '\n(אפשר להשיב במספר או בטקסט)';
   pushToQuizBuffer(userId, rendered);
 }
+
 async function llmForQuiz(messages) {
   if (!client) return '{"score":0}';
-  const resp = await client.responses.create({ model: 'gpt-4o-mini', input: messages });
-  return resp.output_text || '{"score":0}';
+  try {
+    const resp = await client.responses.create({
+      model: 'gpt-4o-mini',
+      input: messages
+    });
+    return resp.output_text || '{"score":0}';
+  } catch (e) {
+    console.error('llmForQuiz OpenAI error:', e?.message || e);
+    return '{"score":0}';
+  }
 }
-const quiz = createQuestionnaire({ sendText: sendQuizText, sendOptions: sendQuizOptions, llm: llmForQuiz });
+
+const quiz = createQuestionnaire({
+  sendText: sendQuizText,
+  sendOptions: sendQuizOptions,
+  llm: llmForQuiz
+});
+
+// עוזר: תמיד מחזיר reply כדי שלא יופיע "No reply" בפרונט
+function replyJson(res, reply, extra = {}, status = 200) {
+  return res.status(status).json({ reply: String(reply ?? ''), ...extra });
+}
 
 // נתיבי API
 app.get('/api/ping', (_req, res) => res.json({ ok: true, t: Date.now() }));
 
 app.post('/api/start-quiz', async (_req, res) => {
   try {
-    const userId = 'default'; //מאתחל
+    const userId = 'default';
     quizBuffers.set(userId, []);
-    await quiz.start(userId); //קורא להתחיל 
-    const reply = (quizBuffers.get(userId) || []).join('\n\n'); //מחזיר תוצאות 
-    return res.json({ reply, quiz: true });
+    await quiz.start(userId);
+    const reply = (quizBuffers.get(userId) || []).join('\n\n');
+    return replyJson(res, reply, { quiz: true });
   } catch (e) {
     console.error('start-quiz error:', e);
-    return res.status(500).json({ error: 'failed_to_start_quiz' });
+    return replyJson(res, 'לא הצלחתי להתחיל את השאלון. בדקי Logs.', { error: 'failed_to_start_quiz' }, 500);
   }
 });
 
 app.post('/api/chat', async (req, res) => {
+  const userId = 'default';
+
   try {
     const { messages = [] } = req.body || {};
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
     const userText = (lastUser?.content || '').toString();
-    const userId = 'default';
 
-    const startRequested = /(^|\/)(start|quiz|שאלון|התחל שאלון)/i.test(userText);
+    // אם השאלון פעיל—ממשיכים רק את השאלון
     const isActive = await quiz.isActive(userId);
-    if (startRequested || isActive) {
+    if (isActive) {
       quizBuffers.set(userId, []);
-      if (startRequested && !isActive) await quiz.start(userId);
-      else await quiz.handle(userId, { message: userText, payload: null });
+      await quiz.handle(userId, { message: userText, payload: null });
       const quizReply = (quizBuffers.get(userId) || []).join('\n\n') || '…';
-      return res.json({ reply: quizReply, quiz: true });
+      return replyJson(res, quizReply, { quiz: true });
     }
 
-    if (client) {
-      const response = await client.responses.create({
-  model: 'gpt-4o-mini',
-  input: [
-    {
-      role: 'system',
-      content:
-        'You are a helpful assistant about Israeli mechinot (pre-army programs) and volunteering. Use the knowledge base when answering. If the answer is not in the knowledge base, say you are not sure.'
-    },
-    ...messages
-  ],
-  tools: [{ type: "file_search" }],
-  tool_resources: {
-    file_search: {
-      vector_store_ids: [process.env.VECTOR_STORE_ID],
-    },
-  },
-});
-      return res.json({ reply: response.output_text });
-    } else {
-      return res.json({ reply: ' . לחצו "התחל שאלון" כדי להתחיל' });
+    // צ'אט רגיל (ללא מקורות / Vector Store)
+    if (!client) {
+      return replyJson(
+        res,
+        'אין חיבור ל-OpenAI כרגע (חסר OPENAI_API_KEY או שהספרייה לא נטענה).'
+      );
     }
-    //טיפול בשגיאות 
+
+    // לוגים מועילים כדי להבין בעיות
+    console.log('[chat] hasKey:', !!process.env.OPENAI_API_KEY, 'hasClient:', !!client);
+
+    // קריאה ל-OpenAI עם try/catch פנימי כדי לא ליפול ל-"No reply"
+    try {
+      const response = await client.responses.create({
+        model: 'gpt-4o-mini',
+        input: [
+          { role: 'system', content: 'You are a helpful assistant. Answer normally like ChatGPT.' },
+          ...messages
+        ]
+      });
+
+      const replyText = (response.output_text || '').trim();
+      return replyJson(res, replyText || 'לא התקבלה תשובה מהמודל. נסי שוב.');
+
+    } catch (e) {
+      console.error('OpenAI error:', e?.message || e);
+      return replyJson(
+        res,
+        'שגיאה בחיבור ל-OpenAI. בדקי OPENAI_API_KEY, חיבור לאינטרנט, ומגבלות שימוש.',
+        { error: 'openai_error', detail: e?.message || 'unknown' },
+        500
+      );
+    }
+
   } catch (err) {
-    console.error('Chat error:', err);
-    return res.status(500).json({ error: 'server_error', detail: err?.message || 'unknown' });
+    console.error('Chat route error:', err);
+    // תמיד reply כדי שהפרונט לא יציג "No reply"
+    return replyJson(
+      res,
+      'יש תקלה זמנית בצ׳אט (שגיאת שרת). בדקי את ה-terminal לשגיאה המדויקת.',
+      { error: 'server_error', detail: err?.message || 'unknown' },
+      500
+    );
   }
 });
-
 
 app.get('/__debug', (req, res) => {
   res.json({
@@ -110,32 +153,25 @@ app.get('/__debug', (req, res) => {
     hostHeader: req.headers.host,
     url: req.originalUrl,
     serverCwd: process.cwd(),
+    dirname: __dirname,
     staticDir: path.join(__dirname, 'public'),
+    hasOpenAIKey: Boolean(process.env.OPENAI_API_KEY),
   });
 });
 
-//קבצים סטטים ודף בית 
 // קבצים סטטיים ודף בית (מותאם ל-Render)
-const fs = require('fs');
 const publicDir = path.join(__dirname, 'public');
-
 app.use(express.static(publicDir));
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 
-// לוגים לבדיקה ב-Render (אפשר למחוק אחרי שעובד)
 console.log('publicDir:', publicDir);
 console.log('index exists:', fs.existsSync(path.join(publicDir, 'index.html')));
+
+// השרת שעליו נמצאים
 const PORT = process.env.PORT || 3000;
-//לפתוח דרך גוגל 
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
-
-//אם רוציפ לפתוח ישר דרך פה 
-//app.listen(PORT, () => {
- // console.log(`Open your app at: http://localhost:${PORT}`);
-//});
-
